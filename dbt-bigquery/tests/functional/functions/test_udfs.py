@@ -1,4 +1,5 @@
 import pytest
+import re
 from dbt.contracts.graph.nodes import FunctionNode
 from dbt.contracts.results import RunStatus
 from dbt.events.types import JinjaLogWarning
@@ -27,6 +28,25 @@ class TestBigqueryUDFs(UDFsBasic):
             "price_for_xlarge.sql": files.MY_UDF_SQL,
             "price_for_xlarge.yml": files.MY_UDF_YML,
         }
+
+    def test_description(self, project, sql_event_catcher):
+        result = run_dbt(["build", "--debug"], callbacks=[sql_event_catcher.catch])
+
+        assert len(result.results) == 1
+        node_result = result.results[0]
+        assert node_result.status == RunStatus.Success
+
+        # Check description
+        assert len(sql_event_catcher.caught_events) == 1
+        pattern = r'OPTIONS\(.*description\s*=\s*"((?:[^"\\]|\\.)*)"'
+        match = re.search(
+            pattern, sql_event_catcher.caught_events[0].data.sql, re.IGNORECASE | re.DOTALL
+        )
+        assert (
+            match
+            and match.group(1)
+            == """Calculate the price for the xlarge version of a standard item. Arguments: - price: The price of the standard item. Returns: The resulting xlarge price"""
+        )
 
 
 class TestBigqueryDeterministicUDFs(DeterministicUDF):
@@ -180,6 +200,25 @@ class TestBigqueryPythonUDFSupported(PythonUDFSupported):
             "price_for_xlarge.py": MY_UDF_PYTHON,
             "price_for_xlarge.yml": files.MY_UDF_PYTHON_YML,
         }
+
+    def test_description(self, project, sql_event_catcher):
+        result = run_dbt(["build", "--debug"], callbacks=[sql_event_catcher.catch])
+
+        assert len(result.results) == 1
+        node_result = result.results[0]
+        assert node_result.status == RunStatus.Success
+
+        # Check description
+        assert len(sql_event_catcher.caught_events) == 1
+        pattern = r'OPTIONS\(.*description\s*=\s*"((?:[^"\\]|\\.)*)"'
+        match = re.search(
+            pattern, sql_event_catcher.caught_events[0].data.sql, re.IGNORECASE | re.DOTALL
+        )
+        assert (
+            match
+            and match.group(1)
+            == """Calculate the price for the xlarge version of a standard item. Arguments: - price: The price of the standard item. Returns: The resulting xlarge price"""
+        )
 
 
 class TestBigqueryPythonUDFRuntimeVersionRequired(PythonUDFRuntimeVersionRequired):
